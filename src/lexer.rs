@@ -1,11 +1,24 @@
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token { 
     Eof, 
     Def, 
     Extern,
     Identifier { id : String },
     Number { value : f64 },
+}
+
+pub fn is_identifier(tok: &Token) -> bool {
+    match tok { 
+        Token::Identifier {..} => true,
+        _ => false
+    }
+}
+
+pub fn get_id(tok: &Token) -> String {
+    match tok {
+        Token::Identifier{id} => id.to_string(),
+        _ => unreachable!()
+    }
 }
 
 pub struct Tokenizer<'a> {
@@ -23,18 +36,22 @@ impl<'a> Tokenizer<'a> {
             last_token: Token::Eof,
             eof_reached: false
         };
-        result.Next();
+        result.next();
         return result;
     }
+
+    pub fn next(&mut self) {
+        self.next_();
+    }
     
-    pub fn Next(&mut self) {
+    pub fn next_(&mut self) {
         if self.eof_reached {
             self.last_token = Token::Eof;
             return;
         }
 
         while self.last_char == ' ' || self.last_char == '\n' || self.last_char == '\t' {
-            if !self.NextChar() {
+            if !self.next_char() {
                 if self.eof_reached {
                     self.last_token = Token::Eof;
                     return;
@@ -47,10 +64,11 @@ impl<'a> Tokenizer<'a> {
     
         if self.last_char.is_alphabetic() {
             let mut identifier: String = self.last_char.to_string();
-            self.NextChar();
-            while self.last_char.is_alphanumeric() {
+            
+            while self.next_char() && self.last_char.is_alphanumeric() {
+                println!("last_char: {}", self.last_char);
                 identifier.push(self.last_char as char);
-                self.NextChar();
+                
             }
     
             if identifier == "def" {
@@ -67,17 +85,17 @@ impl<'a> Tokenizer<'a> {
         } else if self.last_char.is_digit(10) {
             let mut num_str = String::new();
             num_str.push(self.last_char);
-            while self.NextChar() && (self.last_char.is_digit(10) || self.last_char == '.') {
+            while self.next_char() && (self.last_char.is_digit(10) || self.last_char == '.') {
                 num_str.push(self.last_char);
             }
             let num: f64 = num_str.parse().unwrap();
             self.last_token = Token::Number {value: num};
         } else if self.last_char == '#' {
-            while self.NextChar() && self.last_char != '\n' {    
+            while self.next_char() && self.last_char != '\n' {    
             }
             if !self.eof_reached {
-                self.NextChar(); // skip current '\n'
-                self.Next();
+                self.next_char(); // skip current '\n'
+                self.next();
             }
         } else if self.eof_reached {
             // is EOF, return tok_eof
@@ -85,12 +103,17 @@ impl<'a> Tokenizer<'a> {
         } else {
             // should be one of '+', '-', '*', '(', ')'
             let ch = String::from(self.last_char);
-            self.NextChar();
+            self.next_char();
             self.last_token = Token::Identifier { id: ch };
         }
     }
 
-    fn NextChar(&mut self) -> bool {
+    fn next_char(&mut self) -> bool {
+        let res = self.next_char_();
+        res
+    }
+
+    fn next_char_(&mut self) -> bool {
         let mut ch: &mut [u8] = &mut [0];
         match self.input.read(&mut ch) {
             Ok(0) => { self.eof_reached = true; return false },
@@ -99,8 +122,8 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    pub fn LastToken(&self) -> &Token {
-        &self.last_token
+    pub fn last_token(&self) -> Token {
+        self.last_token.clone()
     }
 }
 
